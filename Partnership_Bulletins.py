@@ -5,7 +5,7 @@ import os
 from matplotlib import rcParams
 import numpy as np
 import matplotlib.pyplot as plt
-%matplotlib inline
+
 
 class bulletin_analysis:
     """
