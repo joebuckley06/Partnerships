@@ -5,7 +5,23 @@ import os
 from matplotlib import rcParams
 import numpy as np
 import matplotlib.pyplot as plt
+from multiprocessing.dummy import Pool as ThreadPool
+from itertools import repeat
+from keen.client import KeenClient
+from datetime import timedelta
+from datetime import date
+import datetime
+import time
 
+# keen API call
+os.chdir('/users/jbuckley/Desktop')
+with open('Keen_API_credentials.pickle', 'rb') as f:
+    Keen_API_credentials = pickle.load(f)
+
+Keen_silo = 'QZ prod'  #Qz app, Qz obsession
+projectID = Keen_API_credentials[Keen_silo]['projectID']
+readKey = Keen_API_credentials[Keen_silo]['readKey']
+keen = KeenClient(project_id=projectID, read_key=readKey)
 
 class bulletin_analysis:
     """
@@ -421,3 +437,99 @@ class bulletin_analysis:
         
         plt.tight_layout()
 
+    def interactive_sessions(self,start,end,client):
+        """
+        Keen API call to collect interactive sessions for bulletin content
+        """
+        event = 'ad_interaction'
+
+        timeframe = {'start':start, 'end':end}
+        interval = None
+        timezone = None
+        target_property = 'user.cookie.session.id'
+
+        group_by = ('ad_meta.client.name', 'ad_meta.campaign.name','ad_meta.creative.name','raw_url','glass.device') # could potentially use 'article.permalink' instead of id
+
+        property_name1 = 'ad_meta.unit.type'
+        operator1 = 'eq'
+        property_value1 = 'content'
+
+        property_name2 = 'ad_meta.client.name'
+        operator2 = 'contains'
+        property_value2 = client
+
+
+        filters = [{"property_name":property_name1, "operator":operator1, "property_value":property_value1},
+                  {"property_name":property_name2, "operator":operator2, "property_value":property_value2}]
+
+        data = keen.count_unique(event, 
+                        target_property=target_property,
+                        timeframe=timeframe,
+                        interval=interval,
+                        timezone=timezone,
+                        group_by=group_by,
+                        filters=filters)
+
+        x = pd.DataFrame.from_dict(data)
+        x['start'] = start
+        return x
+
+    def timeframe_gen(self, thread_interval=24, tz='US/Eastern'):
+        """creates timeframe for use in making Keen API calls
+        + args
+        start - start date (str - '2017-08-04'); inclusive
+        end - end date (str - '2017-12-04'); inclusive; it will always include
+            and never exceed this date
+        + kwargs:
+        hour_interval - interval for breaking up start, end tuple
+        tz - timezone, default to US/Eastern
+
+        returns:
+            List of tuples; tuple - (start, end)
+        """
+        freq = str(thread_interval) + 'H'
+        end = pd.to_datetime(self.end)
+        end = end + datetime.timedelta(1)
+        start_dates = pd.date_range(self.start, end, freq=freq, tz=tz)
+        start_dates = start_dates.tz_convert('UTC')
+        end_dates = start_dates + pd.Timedelta(1, unit='D')
+
+        start_times = [datetime.datetime.strftime(
+            i, '%Y-%m-%dT%H:%M:%S.000Z') for i in start_dates]
+        end_times = [datetime.datetime.strftime(
+            i, '%Y-%m-%dT%H:%M:%S.000Z') for i in end_dates]
+        
+        self.start_times = start_times[:-1]
+        self.end_times = end_times[:-1]
+        return(start_times[:-1], end_times[:-1])
+    
+    def data_calls(self, pools=8):
+        """
+        Takes 4 arguments: 
+        - A list of start times
+        - A list of end times 
+        - A client/advertiser. 
+        - Number of threading pools
+
+        Returns:
+        - Time spent data
+        - Pageview data
+        - Click data
+        - Unique page view data
+        - Interactive session data
+
+        """
+        pool = ThreadPool(pools) 
+        start_time = time.time()
+  
+        iter_pool = [(self.start_times[i], self.end_times[i], self.client.lower()) for i in range(len(self.start_times))]
+        int_sessions = pool.starmap(self.interactive_sessions, iter_pool)
+
+        #int_sessions = pool.starmap(self.interactive_sessions, zip(self.start_times, self.end_times, self.client))
+        print('Interactive sessions: Done')
+        # close the pool and wait for the work to finish 
+        pool.close() 
+        pool.join() 
+        print(str(pools), "Pools took", time.time() - start_time, "to run")
+        self.df_int = pd.concat(int_sessions)
+        return(self.df_int)
