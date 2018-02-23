@@ -73,7 +73,7 @@ class bulletin_analysis:
             board_id = '5a33f0ff736b79c65e000ba5'
         
         # API call parameters
-        if use_tags = True:
+        if use_tags == True:
             parameters = {'board_id': board_id, # MUST INCLUDE
               'day[gte]': self.start, # INCLUDE start date
               'day[lte]': self.end, # INCLUDE end date
@@ -84,7 +84,7 @@ class bulletin_analysis:
               'tags': self.tags, 
               #'authors': self.client,
               'sort': '-page_views'}
-        elif use_tags = False:
+        elif use_tags == False:
             parameters = {'board_id': board_id, # MUST INCLUDE
               'day[gte]': self.start, # INCLUDE start date
               'day[lte]': self.end, # INCLUDE end date
