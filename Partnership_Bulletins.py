@@ -114,6 +114,7 @@ class bulletin_analysis:
             except:
                 pass
         df_SR["article_id"] = df_SR["url"].apply(get_id)
+        df_SR['avg_engaged_time'] = df_SR['avg_engaged_time'].astype(float).astype(int)
         self.df_SR = df_SR.copy()
         print("DataFrame = self.df_SR")
         def b_cat(url_id):
@@ -134,6 +135,7 @@ class bulletin_analysis:
         df_bulletin['total_engaged_time'] = df_bulletin['total_engaged_time'].astype(float)
         df_bulletin = df_bulletin.groupby(['Bulletin'],as_index=False)[metric_list].sum()
         df_bulletin['avg_engaged_time'] = df_bulletin['total_engaged_time'] / df_bulletin['page_views']
+        df_bulletin['avg_engaged_time'] = df_bulletin['avg_engaged_time'].astype(float).astype(int)
         self.df_bulletin = df_bulletin.copy()
         print("(Rows, Columns) : " + str(self.df_SR.shape))
         print("Overall Bulletin Data")
