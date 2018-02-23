@@ -31,9 +31,10 @@ class bulletin_analysis:
     ex: bulletin_dict = {'Bulletin_1':['1184288','1181223'], 
                      'Bulletin_2': ['1180851','1184618']}
     """
-    def __init__(self, client, bulletin_urls):
+    def __init__(self, client, bulletin_urls, tags=''):
         self.client = client
         self.bulletin_dict = bulletin_urls
+        self.tags = tags
         pass
     
     def dates(self,start_date,end_date):
@@ -54,7 +55,7 @@ class bulletin_analysis:
         self.SRAPPKEY = SR_creds['SRAPPKEY']
         print("SimpleReach Access granted")
     
-    def SR_get_data(self, dashboard='qz',limit=150):
+    def SR_get_data(self, dashboard='qz',limit=150, use_tags=True):
         """
         Retrieves article data from SimpleReach and returns a DataFrame
         
@@ -72,14 +73,26 @@ class bulletin_analysis:
             board_id = '5a33f0ff736b79c65e000ba5'
         
         # API call parameters
-        parameters = {'board_id': board_id, # MUST INCLUDE
+        if use_tags = True:
+            parameters = {'board_id': board_id, # MUST INCLUDE
               'day[gte]': self.start, # INCLUDE start date
               'day[lte]': self.end, # INCLUDE end date
               'limit': limit,
               'metric_groups': 'core_data,social_referral_breakouts,social_actions_by_network', 
               #'fields': 'page',
               'group_by': 'content_id', 
-              #'tags': tags, 
+              'tags': self.tags, 
+              #'authors': self.client,
+              'sort': '-page_views'}
+        elif use_tags = False:
+            parameters = {'board_id': board_id, # MUST INCLUDE
+              'day[gte]': self.start, # INCLUDE start date
+              'day[lte]': self.end, # INCLUDE end date
+              'limit': limit,
+              'metric_groups': 'core_data,social_referral_breakouts,social_actions_by_network', 
+              #'fields': 'page',
+              'group_by': 'content_id', 
+              #'tags': self.tags, 
               'authors': self.client,
               'sort': '-page_views'}
         
