@@ -62,6 +62,7 @@ class bulletin_analysis:
         Kwargs
         dashboard = 'qz','at_work', 'qz_bulletins','at_work_bulletins'
         limit = the max number of articles you want returned
+        use_tags = True/False (run api call with tags, run with author/client as False)
         """
         if dashboard == 'qz':
             board_id = '530e59b3b91c275929001c3b'
