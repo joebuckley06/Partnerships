@@ -112,7 +112,7 @@ class bulletin_analysis:
                 return(x)
             except:
                 pass
-        df_SR["article_id"] = df_SR['url'].apply(get_id)
+        df_SR["article_id"] = df_SR["url"].apply(get_id)
         self.df_SR = df_SR.copy()
         print("DataFrame = self.df_SR")
         def b_cat(url_id):
