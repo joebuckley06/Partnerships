@@ -12,6 +12,7 @@ from datetime import timedelta
 from datetime import date
 import datetime
 import time
+from pandas import ExcelWriter
 
 # keen API call
 os.chdir('/users/jbuckley/Desktop')
@@ -140,6 +141,27 @@ class bulletin_analysis:
         print("(Rows, Columns) : " + str(self.df_SR.shape))
         print("Overall Bulletin Data")
         return(self.df_bulletin)
+        
+    def tableau_data(self, file_ext_name = '_tableau_data.xlsx',file_directory='/Users/jbuckley/Desktop'):
+        """
+        Transforms data into format easily readable by Tableau and outputs as an Excel doc
+        
+        """
+        action_cols = self.df_SR.filter(regex='actions$', axis=1).columns
+        referral_cols = self.df_SR.filter(regex='referrals$', axis=1).columns
+        client_actions = pd.melt(self.df_SR, id_vars=['title'], value_vars=action_cols)
+        client_refs = pd.melt(self.df_SR, id_vars=['title'], value_vars=referral_cols)
+        client_social = pd.merge(client_actions,client_refs,on='title',how='inner')
+        client_social = client_social.rename(columns={'variable_x':'social_action',
+                                       'value_x':'actions',
+                                       'variable_y':'social_referrer',
+                                       'value_y':'referrals'})
+        df_overall = self.df_SR[['title','time_on_site_total','page_views','avg_engaged_time']]
+        
+        writer = ExcelWriter(self.client+file_ext_name)
+        client_social.to_excel(writer,'Social')
+        df_overall.to_excel(writer, 'Overall')
+        writer.save()
     
     def plotting_headlines(self, metric1='page_views',metric2='avg_engaged_time',metric3='social_actions',metric4='facebook_referrals',
                      m1_benchmark=0, m2_benchmark=0, m3_benchmark=0, m4_benchmark=0, 
