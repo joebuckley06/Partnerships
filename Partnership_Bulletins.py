@@ -28,14 +28,10 @@ class bulletin_analysis:
     """
     Class to retrieve Bulletin data for a certain client for a time period and return charts
     
-    ex: client = "Accenture"
-    ex: bulletin_dict = {'Bulletin_1':['1184288','1181223'], 
-                     'Bulletin_2': ['1180851','1184618']}
     """
-    def __init__(self, client, bulletin_urls, tags=''):
+    def __init__(self, client, bulletin_urls):
         self.client = client
         self.bulletin_dict = bulletin_urls
-        self.tags = tags
         pass
     
     def dates(self,start_date,end_date):
@@ -56,14 +52,13 @@ class bulletin_analysis:
         self.SRAPPKEY = SR_creds['SRAPPKEY']
         print("SimpleReach Access granted")
     
-    def SR_get_data(self, dashboard='qz',limit=150, use_tags=True):
+    def SR_get_data(self, dashboard='qz',limit=150, daily=False):
         """
         Retrieves article data from SimpleReach and returns a DataFrame
         
         Kwargs
         dashboard = 'qz','at_work', 'qz_bulletins','at_work_bulletins'
         limit = the max number of articles you want returned
-        use_tags = True/False (run api call with tags, run with author/client as False)
         """
         if dashboard == 'qz':
             board_id = '530e59b3b91c275929001c3b'
@@ -74,29 +69,31 @@ class bulletin_analysis:
         elif dashboard == 'at_work_bulletins':
             board_id = '5a33f0ff736b79c65e000ba5'
         
+        self.daily = daily
         # API call parameters
-        if use_tags == True:
+        if daily == True:
             parameters = {'board_id': board_id, # MUST INCLUDE
               'day[gte]': self.start, # INCLUDE start date
               'day[lte]': self.end, # INCLUDE end date
               'limit': limit,
               'metric_groups': 'core_data,social_referral_breakouts,social_actions_by_network', 
               #'fields': 'page',
-              'group_by': 'content_id', 
-              'tags': self.tags, 
-              #'authors': self.client,
-              'sort': '-page_views'}
-        elif use_tags == False:
-            parameters = {'board_id': board_id, # MUST INCLUDE
-              'day[gte]': self.start, # INCLUDE start date
-              'day[lte]': self.end, # INCLUDE end date
-              'limit': limit,
-              'metric_groups': 'core_data,social_referral_breakouts,social_actions_by_network', 
-              #'fields': 'page',
-              'group_by': 'content_id', 
-              #'tags': self.tags, 
+              'group_by': 'content_id,day', 
+              #'tags': tags, 
               'authors': self.client,
               'sort': '-page_views'}
+        else:
+            parameters = {'board_id': board_id, # MUST INCLUDE
+              'day[gte]': self.start, # INCLUDE start date
+              'day[lte]': self.end, # INCLUDE end date
+              'limit': limit,
+              'metric_groups': 'core_data,social_referral_breakouts,social_actions_by_network', 
+              #'fields': 'page',
+              'group_by': 'content_id', 
+              #'tags': tags, 
+              'authors': self.client,
+              'sort': '-page_views'}
+        
         
         # API keys
         headers = {"SRTOKEN":self.SRTOKEN,
@@ -114,8 +111,7 @@ class bulletin_analysis:
                 return(x)
             except:
                 pass
-        df_SR["article_id"] = df_SR["url"].apply(get_id)
-        df_SR['avg_engaged_time'] = df_SR['avg_engaged_time'].astype(float).astype(int)
+        df_SR["article_id"] = df_SR['url'].apply(get_id)
         self.df_SR = df_SR.copy()
         print("DataFrame = self.df_SR")
         def b_cat(url_id):
@@ -136,32 +132,36 @@ class bulletin_analysis:
         df_bulletin['total_engaged_time'] = df_bulletin['total_engaged_time'].astype(float)
         df_bulletin = df_bulletin.groupby(['Bulletin'],as_index=False)[metric_list].sum()
         df_bulletin['avg_engaged_time'] = df_bulletin['total_engaged_time'] / df_bulletin['page_views']
-        df_bulletin['avg_engaged_time'] = df_bulletin['avg_engaged_time'].astype(float).astype(int)
         self.df_bulletin = df_bulletin.copy()
         print("(Rows, Columns) : " + str(self.df_SR.shape))
         print("Overall Bulletin Data")
         return(self.df_bulletin)
-        
+    
     def tableau_data(self, file_ext_name = '_tableau_data.xlsx',file_directory='/Users/jbuckley/Desktop'):
         """
         Transforms data into format easily readable by Tableau and outputs as an Excel doc
         
         """
-        action_cols = self.df_SR.filter(regex='actions$', axis=1).columns
-        referral_cols = self.df_SR.filter(regex='referrals$', axis=1).columns
-        client_actions = pd.melt(self.df_SR, id_vars=['title'], value_vars=action_cols)
-        client_refs = pd.melt(self.df_SR, id_vars=['title'], value_vars=referral_cols)
-        client_social = pd.merge(client_actions,client_refs,on='title',how='inner')
-        client_social = client_social.rename(columns={'variable_x':'social_action',
-                                       'value_x':'actions',
-                                       'variable_y':'social_referrer',
-                                       'value_y':'referrals'})
-        df_overall = self.df_SR[['title','time_on_site_total','page_views','avg_engaged_time']]
+        print("Daily data == "+ str(self.daily))
         
-        writer = ExcelWriter(self.client+file_ext_name)
-        client_social.to_excel(writer,'Social')
-        df_overall.to_excel(writer, 'Overall')
-        writer.save()
+        metric_list = ['facebook_actions',
+       'facebook_referrals', 'googleplus_actions', 'googleplus_referrals',
+       'linkedin_actions', 'linkedin_referrals', 'page_views',
+       'pinterest_actions', 'pinterest_referrals', 'reddit_referrals',
+       'social_actions', 'stumbleupon_actions', 'stumbleupon_referrals',
+       'time_on_site_total', 'total_engaged_time', 'twitter_actions',
+       'twitter_followers', 'twitter_referrals']
+        if self.daily == True:
+            client_metrics = pd.melt(self.df_SR, id_vars=['title','day'], value_vars=metric_list)
+            writer = ExcelWriter(self.client+file_ext_name)
+            client_metrics.to_excel(writer,'All_Metrics_Daily')
+            writer.save()
+        else:
+            client_metrics = pd.melt(self.df_SR, id_vars='title', value_vars=metric_list)
+            writer = ExcelWriter(self.client+file_ext_name)
+            client_metrics.to_excel(writer,'All_Metrics_Cumulative')
+            writer.save()
+        print("File ready: "+self.client+file_ext_name)
     
     def plotting_headlines(self, metric1='page_views',metric2='avg_engaged_time',metric3='social_actions',metric4='facebook_referrals',
                      m1_benchmark=0, m2_benchmark=0, m3_benchmark=0, m4_benchmark=0, 
@@ -279,7 +279,7 @@ class bulletin_analysis:
         ax3.set_xlabel(xlabel,wrap=True)
         ax3.set_title(metric3, title_font,**font_name)
         ax3.set_xticks(ind + width / 2)
-        ax3.set_xticklabels(x_labels, rotation=20,va='top')
+        ax3.set_xticklabels(x_labels, rotation=20,va='top',ha='right')
 
         if m3_benchmark > 0:
             ax3.legend((rects1[0],line1), (self.client,'Benchmark'))
@@ -474,7 +474,7 @@ class bulletin_analysis:
             pass
         
         plt.tight_layout()
-
+    
     def interactive_sessions(self,start,end,client):
         """
         Keen API call to collect interactive sessions for bulletin content
